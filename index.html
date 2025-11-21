@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>寶可夢戰術特訓 - 聲光效果版</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --sidebar-bg: #f8f9fa;
+            --btn-exit: #90a4ae;
+            --btn-random: #7e57c2;
+            --btn-chart: #0288d1;
+            --btn-sound: #e91e63;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* Header 區域 */
+        .header-bar {
+            width: 100%;
+            max-width: 850px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin: 10px 0;
+            min-height: 40px;
+        }
+
+        h1 { margin: 0; color: #333; font-size: 1.4em; }
+
+        /* 右上角按鈕群組 */
+        .header-controls {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85em;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-chart { background-color: var(--btn-chart); }
+        .btn-chart:hover { background-color: #0277bd; }
+        
+        .btn-sound { background-color: var(--btn-sound); width: 90px; justify-content: center; }
+        .btn-sound:hover { background-color: #c2185b; }
+        .btn-sound.muted { background-color: #9e9e9e; }
+
+        /* 通用容器 */
+        .container {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 850px;
+            text-align: center;
+            display: none;
+            box-sizing: border-box;
+        }
+        .active { display: block !important; }
+
+        /* 狀態列 */
+        .status-bar {
+            display: flex;
+            justify-content: flex-end;
+            background: #eee;
+            padding: 8px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        /* 戰術回饋文字 */
+        .text-super { color: #d32f2f; font-weight: bold; font-size: 1.1em; }
+        .text-weak { color: #1976d2; font-weight: bold; }
+        .text-immune { color: #616161; font-weight: bold; }
+        .text-perfect { color: #f57f17; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 5px rgba(245, 127, 23, 0.2); }
+        .text-normal { color: #555; font-weight: bold; }
+
+        /* 官方風格屬性圖標 (SVG) */
+        .type-icon-wrapper {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin-right: 5px;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.2); flex-shrink: 0;
+        }
+        .type-icon-svg { width: 14px; height: 14px; filter: brightness(0) invert(1); }
+
+        /* 實心圓點 (選角列表用) */
+        .mini-type-dot {
+            width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        }
+
+        /* 小抄 Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 999; display: none;
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; width: 95%; max-width: 800px; height: 85%;
+            border-radius: 10px; padding: 10px; display: flex; flex-direction: column;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 10px;
+        }
+        .modal-body { flex: 1; overflow: auto; }
+        .chart-table { border-collapse: collapse; width: 100%; font-size: 0.8em; }
+        .chart-table th, .chart-table td { border: 1px solid #e0e0e0; padding: 4px; text-align: center; min-width: 25px; }
+        .chart-header { position: sticky; top: 0; background: #fff; z-index: 2; }
+        .chart-side-header { position: sticky; left: 0; background: #fff; z-index: 1; }
+        .cell-2x { background-color: #ffebee; color: #d32f2f; font-weight: bold; }
+        .cell-05x { background-color: #e3f2fd; color: #1976d2; }
+        .cell-0x { background-color: #eee; color: #757575; }
+
+        /* 隊伍選擇介面 */
+        .draft-layout { display: flex; height: 480px; gap: 15px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
+        .draft-sidebar { width: 140px; background: var(--sidebar-bg); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 5px; border-right: 1px solid #ddd; }
+        .draft-main { flex: 1; overflow-y: auto; padding: 15px; background: #fff; }
+        .draft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
+
+        @media (max-width: 600px) {
+            .draft-layout { flex-direction: column; height: 550px; }
+            .draft-sidebar { width: 100%; height: 80px; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #ddd; white-space: nowrap; }
+            .filter-btn { min-width: 90px; }
+            .draft-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+        }
+
+        .filter-btn { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.9em; cursor: pointer; background: #fff; color: #333; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s; }
+        .filter-btn.active { background: #333; color: #fff; border-color: #333; }
+
+        .draft-card { border: 1px solid #eee; border-radius: 8px; padding: 10px 5px; cursor: pointer; background: #fff; display: flex; flex-direction: column; align-items: center; position: relative; transition: transform 0.1s, box-shadow 0.1s; min-height: 115px; justify-content: flex-start; gap: 6px; }
+        .draft-card:hover { background: #f9f9f9; transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .draft-card.picked { background-color: #e8f5e9; border-color: #4caf50; box-shadow: 0 0 0 2px #4caf50; opacity: 1; }
+        .draft-card.picked::after { content: '✔'; position: absolute; top: 4px; right: 4px; background: #4caf50; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; display: flex; align-items: center; justify-content: center; z-index: 2; }
+        .draft-card img { width: 65px; height: 65px; object-fit: contain; flex-shrink: 0; }
+        .draft-name { font-size: 0.85em; font-weight: bold; text-align: center; line-height: 1.2; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
+        .draft-types { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; width: 100%; }
+
+        /* 戰鬥畫面 */
+        .enemy-display { margin: 15px 0; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center;}
+        
+        /* 寶可夢圖片 - 增加過渡效果 */
+        .enemy-img { 
+            width: 140px; height: 140px; 
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2));
+            opacity: 0; /* 預設隱藏 */
+            transition: opacity 0.5s ease-in; /* 漸現效果 */
+        }
+        
+        .type-badge-text { padding: 4px 10px; border-radius: 20px; color: white; font-size: 0.9em; font-weight: bold; margin: 0 2px; display: inline-flex; align-items: center; gap: 5px; }
+
+        .battle-team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .team-card { background: #f9f9f9; border: 2px solid #eee; border-radius: 8px; padding: 8px; cursor: pointer; transition: transform 0.1s; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .team-card:active { transform: scale(0.95); }
+        .team-card.selected { border-color: #333; background: #e0e0e0; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+
+        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+        @media(min-width: 500px) { .grid-container { grid-template-columns: repeat(6, 1fr); } }
+
+        .game-btn { padding: 8px; border: 2px solid transparent; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; font-size: 0.95em; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .game-btn.selected { border-color: #333; transform: scale(1.05); box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+
+        /* 按鈕群 */
+        .action-btn { width: 100%; padding: 12px; font-size: 1.1em; color: white; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; font-weight: bold; }
+        .btn-menu { background-color: #3f51b5; margin-bottom: 10px; }
+        .btn-confirm { background-color: #333; }
+        .btn-next { background-color: #4caf50; display: none; }
+        .btn-exit { background-color: var(--btn-exit); margin-top: 15px; }
+        .btn-exit:hover { background-color: #78909c; }
+        .btn-random { background-color: var(--btn-random); margin-bottom: 10px; }
+        .btn-random:hover { background-color: #673ab7; }
+
+        /* 屬性顏色 */
+        .bg-normal { background: #A8A878; } .bg-fire { background: #F08030; } .bg-water { background: #6890F0; }
+        .bg-grass { background: #78C850; } .bg-electric { background: #F8D030; } .bg-ice { background: #98D8D8; }
+        .bg-fighting { background: #C03028; } .bg-poison { background: #A040A0; } .bg-ground { background: #E0C068; }
+        .bg-flying { background: #A890F0; } .bg-psychic { background: #F85888; } .bg-bug { background: #A8B820; }
+        .bg-rock { background: #B8A038; } .bg-ghost { background: #705898; } .bg-dragon { background: #7038F8; }
+        .bg-steel { background: #B8B8D0; } .bg-dark { background: #705848; } .bg-fairy { background: #EE99AC; }
+    </style>
+</head>
+<body>
+
+    <div class="header-bar">
+        <h1>寶可夢戰術特訓</h1>
+        <div class="header-controls">
+            <button class="header-btn btn-sound" id="btn-sound" onclick="game.toggleSound()">🔊 開啟</button>
+            <button class="header-btn btn-chart" onclick="game.toggleChart()">📖 屬性表</button>
+        </div>
+    </div>
+
+    <!-- 1. 主選單 -->
+    <div id="screen-menu" class="container active">
+        <p>選擇訓練模式：</p>
+        <button class="action-btn btn-menu" onclick="game.initMode('attack')">
+            ⚔️ 攻擊特訓<br><span style="font-size:0.8em; font-weight:normal;">選擇剋制屬性 (練習屬性表)</span>
+        </button>
+        <button class="action-btn btn-menu" style="background-color: #009688;" onclick="game.initMode('defense')">
+            🛡️ 防守特訓<br><span style="font-size:0.8em; font-weight:normal;">選擇抵抗屬性 (練習聯防)</span>
+        </button>
+        <button class="action-btn btn-menu" style="background-color: #ff9800;" onclick="game.initMode('team')">
+            👥 6選1 實戰模擬<br><span style="font-size:0.8em; font-weight:normal;">隊伍實戰，講求攻防一體</span>
+        </button>
+        
+        <div style="margin-top:15px; font-size:0.9em; color:#666; text-align:left; background:#f9f9f9; padding:10px; border-radius:8px;">
+            <b>更新說明：</b><br>
+            • <b>聲光效果</b>：寶可夢會延遲1秒並伴隨叫聲登場。<br>
+            • <b>聲音開關</b>：右上角可隨時切換靜音。<br>
+            • <b>防守判定</b>：單獨計算每個屬性傷害，1倍為打平。
+        </div>
+    </div>
+
+    <!-- 2. 隊伍選擇 (Draft) -->
+    <div id="screen-draft" class="container" style="max-width: 850px;">
+        <h2>組建你的隊伍 (<span id="draft-count">0</span>/6)</h2>
+        <button class="action-btn btn-random" onclick="game.randomDraft()">🎲 隨機組隊 (屬性平衡)</button>
+        <div class="draft-layout">
+            <div class="draft-sidebar" id="draft-filter-list"></div>
+            <div class="draft-main">
+                <div id="draft-grid" class="draft-grid"></div>
+            </div>
+        </div>
+        <button id="btn-start-team" class="action-btn" disabled onclick="game.finishDraft()" style="background:#ccc;">開始戰鬥</button>
+        <button class="action-btn btn-exit" onclick="game.quitToMenu()">退出回到選單</button>
+    </div>
+
+    <!-- 3. 遊戲主畫面 -->
+    <div id="screen-game" class="container" style="max-width: 600px;">
+        <div class="status-bar">
+            <div>回合: <span id="round-current">1</span>/10</div>
+        </div>
+
+        <div class="enemy-display">
+            <img id="enemy-img" class="enemy-img" src="" alt="Enemy">
+            <div id="enemy-name" style="font-size:1.5em; font-weight:bold; margin:5px 0; opacity: 0; transition: opacity 0.5s;">???</div>
+            <div id="enemy-reveal" style="min-height:34px;"><span style="color:#999">??? 屬性 ???</span></div>
+        </div>
+
+        <div id="round-log" style="background:#fafafa; padding:10px; border-radius:8px; min-height:3em; font-size:1em; border:1px solid #eee; display:flex; align-items:center; justify-content:center; flex-direction:column; line-height:1.5;">
+            等待對手出現...
+        </div>
+
+        <div id="ui-types" class="grid-container" style="display:none;"></div>
+        <div id="ui-team" class="battle-team-grid" style="display:none;"></div>
+
+        <button id="btn-submit" class="action-btn btn-confirm" onclick="game.submit()">確認選擇</button>
+        <button id="btn-next" class="action-btn btn-next" onclick="game.nextRound()">下一回合 ➜</button>
+        <button class="action-btn btn-exit" onclick="game.quitToMenu()">退出回到選單</button>
+    </div>
+
+    <!-- 4. 結算畫面 -->
+    <div id="screen-result" class="container">
+        <h2>訓練結束</h2>
+        <p style="font-size:1.2em; margin:20px 0;">特訓完成！</p>
+        <button class="action-btn" onclick="location.reload()">回到主選單</button>
+    </div>
+
+    <!-- 5. 屬性表小抄 (Modal) -->
+    <div id="modal-chart" class="modal-overlay" onclick="game.toggleChart()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 style="margin:0">屬性相剋表 (攻 \ 守)</h3>
+                <button onclick="game.toggleChart()" style="border:none;background:none;font-size:1.5em;cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === 資料庫 ===
+        const RAW_DATA = [
+            "3|妙蛙花|grass|poison","6|噴火龍|fire|flying","9|水箭龜|water","12|巴大蝶|bug|flying","15|大針蜂|bug|poison","18|大比鳥|normal|flying","20|拉達|normal","22|大嘴雀|normal|flying","24|阿柏怪|poison","26|雷丘|electric","28|穿山王|ground","31|尼多后|poison|ground","34|尼多王|poison|ground","36|皮可西|fairy","38|九尾|fire","40|胖可丁|normal|fairy","45|霸王花|grass|poison","47|派拉斯特|bug|grass","49|摩魯蛾|bug|poison","51|三地鼠|ground","53|貓老大|normal","55|哥達鴨|water","57|火爆猴|fighting","59|風速狗|fire","62|快泳蛙|water|fighting","65|胡地|psychic","68|怪力|fighting","71|大食花|grass|poison","73|毒刺水母|water|poison","76|隆隆岩|rock|ground","78|烈焰馬|fire","80|呆殼獸|water|psychic","82|三合一磁怪|electric|steel","83|大蔥鴨|normal|flying","85|嘟嘟利|normal|flying","87|白海獅|water|ice","89|臭臭泥|poison","91|刺甲貝|water|ice","94|耿鬼|ghost|poison","95|大岩蛇|rock|ground","97|引夢貘人|psychic","99|巨鉗蟹|water","101|頑皮雷彈|electric","103|椰蛋樹|grass|psychic","105|嘎啦嘎啦|ground","106|飛腿郎|fighting","107|快拳郎|fighting","110|雙彈瓦斯|poison","112|鑽角犀獸|ground|rock","115|袋獸|normal","119|金魚王|water","121|寶石海星|water|psychic","122|魔牆人偶|psychic|fairy","123|飛天螳螂|bug|flying","124|迷唇姐|ice|psychic","127|凱羅斯|bug","128|肯泰羅|normal","130|暴鯉龍|water|flying","131|拉普拉斯|water|ice","132|百變怪|normal","134|水伊布|water","135|雷伊布|electric","136|火伊布|fire","142|化石翼龍|rock|flying","143|卡比獸|normal","144|急凍鳥|ice|flying","145|閃電鳥|electric|flying","146|火焰鳥|fire|flying","149|快龍|dragon|flying","150|超夢|psychic","151|夢幻|psychic",
+            "154|大竺葵|grass","157|火暴獸|fire","160|大力鱷|water","162|大尾立|normal","164|貓頭夜鷹|normal|flying","166|安瓢蟲|bug|flying","168|阿利多斯|bug|poison","169|叉字蝠|poison|flying","171|電燈怪|water|electric","178|天然鳥|psychic|flying","181|電龍|electric","182|美麗花|grass","184|瑪力露麗|water|fairy","185|樹才怪|rock","186|牛蛙君|water","189|毽子棉|grass|flying","192|向日花怪|grass","195|沼王|water|ground","196|太陽伊布|psychic","197|月亮伊布|dark","199|呆呆王|water|psychic","202|果然翁|psychic","203|麒麟奇|normal|psychic","205|佛烈托斯|bug|steel","206|土龍弟弟|normal","208|大鋼蛇|steel|ground","210|布魯皇|fairy","212|巨鉗螳螂|bug|steel","213|壺壺|bug|rock","214|赫拉克羅斯|bug|fighting","217|圈圈熊|normal","219|熔岩蝸牛|fire|rock","222|太陽珊瑚|water|rock","224|章魚桶|water","225|信使鳥|ice|flying","226|巨翅飛魚|water|flying","227|盔甲鳥|steel|flying","229|黑魯加|dark|fire","230|刺龍王|water|dragon","232|頓甲|ground","235|圖圖犬|normal","237|戰舞郎|fighting","241|大奶罐|normal","242|幸福蛋|normal","243|雷公|electric","244|炎帝|fire","245|水君|water","248|班基拉斯|rock|dark","249|洛奇亞|psychic|flying","250|鳳王|fire|flying",
+            "254|蜥蜴王|grass","257|火焰雞|fire|fighting","260|巨沼怪|water|ground","262|大狼犬|dark","264|直衝熊|normal","267|狩獵鳳蝶|bug|flying","269|毒粉蛾|bug|poison","272|樂天河童|water|grass","275|狡猾天狗|grass|dark","277|大王燕|normal|flying","279|大嘴鷗|water|flying","282|沙奈朵|psychic|fairy","284|雨翅蛾|bug|flying","286|斗笠菇|grass|fighting","289|請假王|normal","291|鐵面忍者|bug|flying","292|脫殼忍者|bug|ghost","295|爆音怪|normal","297|超力王|fighting","302|勾魂眼|dark|ghost","303|大嘴娃|steel|fairy","306|波士可多拉|steel|rock","308|恰雷姆|fighting|psychic","310|雷電獸|electric","311|正電拍拍|electric","312|負電拍拍|electric","313|電螢蟲|bug","314|甜甜螢|bug","317|吞食獸|poison","319|巨牙鯊|water|dark","321|吼鯨王|water","323|噴火駝|fire|ground","324|煤炭龜|fire","326|噗噗豬|psychic","327|晃晃斑|normal","330|沙漠蜻蜓|ground|dragon","332|夢歌仙人掌|grass|dark","334|七夕青鳥|dragon|flying","335|貓鼬斬|normal","336|飯匙蛇|poison","337|月石|rock|psychic","338|太陽岩|rock|psychic","340|鯰魚王|water|ground","342|鐵螯龍蝦|water|dark","344|念力土偶|ground|psychic","346|搖籃百合|rock|grass","348|太古盔甲|rock|bug","350|美納斯|water","351|漂浮泡泡|normal","352|變隱龍|normal","354|詛咒娃娃|ghost","356|彷徨夜靈|ghost","357|熱帶龍|grass|flying","359|阿勃梭魯|dark","362|冰鬼護|ice","365|帝牙海獅|ice|water","369|古空棘魚|water|rock","370|愛心魚|water","373|暴飛龍|dragon|flying","376|巨金怪|steel|psychic","377|雷吉洛克|rock","378|雷吉艾斯|ice","379|雷吉斯奇魯|steel","380|拉帝亞斯|dragon|psychic","381|拉帝歐斯|dragon|psychic","382|蓋歐卡|water","383|固拉多|ground","384|烈空坐|dragon|flying","386|代歐奇希斯|psychic",
+            "389|土台龜|grass|ground","392|烈焰猴|fire|fighting","395|帝王拿波|water|steel","398|姆克鷹|normal|flying","400|大尾貍|normal|water","402|音箱蟀|bug","405|倫琴貓|electric","407|羅絲雷朵|grass|poison","409|戰槌龍|rock","411|護城龍|rock|steel","413|結草貴婦|bug|grass","414|紳士蛾|bug|flying","416|蜂女王|bug|flying","419|浮潛鼬|water","421|櫻花兒|grass","424|雙尾怪手|normal","426|隨風球|ghost|flying","428|長耳兔|normal","429|夢妖魔|ghost","430|烏鴉頭頭|dark|flying","432|東施喵|normal","435|坦克臭鼬|poison|dark","437|青銅鐘|steel|psychic","441|聒噪鳥|normal|flying","442|花岩怪|ghost|dark","445|烈咬陸鯊|dragon|ground","448|路卡利歐|fighting|steel","450|河馬獸|ground","452|龍王蠍|poison|dark","454|毒骷蛙|poison|fighting","455|尖牙籠|grass","457|霓虹魚|water","460|暴雪王|grass|ice","461|瑪狃拉|dark|ice","462|自爆磁怪|electric|steel","464|超甲狂犀|ground|rock","465|巨蔓藤|grass","466|電擊魔獸|electric","467|鴨嘴炎獸|fire","468|波克基斯|fairy|flying","469|遠古巨蜓|bug|flying","472|天蠍王|ground|flying","473|象牙豬|ice|ground","474|多邊獸Z|normal","475|艾路雷朵|psychic|fighting","476|大朝北鼻|rock|steel","477|黑夜魔靈|ghost","478|雪妖女|ice|ghost","479|洛托姆|electric|ghost","483|帝牙盧卡|steel|dragon","484|帕路奇亞|water|dragon","485|席多藍恩|fire|steel","487|騎拉帝納|ghost|dragon","488|克雷色利亞|psychic","491|達克萊伊|dark","493|阿爾宙斯|normal",
+            "530|龍頭地鼠|ground|steel","534|修繕老頭|fighting","545|蜈蚣王|bug|poison","547|風妖精|grass|fairy","553|流氓鱷|ground|dark","555|達摩狒狒|fire","560|頭巾混混|dark|fighting","561|象徵鳥|psychic|flying","563|死神棺|ghost","565|肋骨海龜|water|rock","567|始祖大鳥|rock|flying","571|索羅亞克|dark","579|人造細胞卵|psychic","593|胖嘟嘟|water|ghost","596|電蜘蛛|bug|electric","598|堅果啞鈴|grass|steel","604|麻麻鰻魚王|electric","609|水晶燈火靈|ghost|fire","612|雙斧戰龍|dragon","620|師父鼬|fighting","623|泥偶巨人|ground|ghost","625|劈斬司令|dark|steel","628|勇士雄鷹|normal|flying","630|禿鷹娜|dark|flying","635|三首惡龍|dark|dragon","637|火神蛾|bug|fire","639|代拉基翁|rock|fighting","641|龍捲雲|flying","642|雷杜雲|electric|flying","645|土地雲|ground|flying",
+            "652|布里卡隆|grass|fighting","655|妖火紅狐|fire|psychic","658|甲賀忍蛙|water|dark","660|挖掘兔|normal|ground","663|烈箭鷹|fire|flying","666|彩粉蝶|bug|flying","673|坐騎山羊|grass","675|流氓熊貓|fighting|dark","678|超能妙喵|psychic","681|堅盾劍怪|steel|ghost","687|烏賊王|dark|psychic","691|毒藻龍|poison|dragon","693|鋼炮臂蝦|water","697|怪顎龍|rock|dragon","699|冰雪巨龍|rock|ice","700|仙子伊布|fairy","701|摔角鷹人|fighting|flying","702|咚咚鼠|electric|fairy","706|黏美龍|dragon","707|鑰圈兒|steel|fairy","709|朽木妖|ghost|grass","713|冰岩怪|ice","715|音波龍|flying|dragon","716|哲爾尼亞斯|fairy","717|伊裴爾塔爾|dark|flying",
+            "724|狙射樹梟|grass|ghost","727|熾焰咆哮虎|fire|dark","730|西獅海壬|water|fairy","733|銃嘴大鳥|normal|flying","735|貓鼬探長|normal","738|鍬農炮蟲|bug|electric","740|好勝毛蟹|fighting|ice","743|蝶結萌虻|bug|fairy","745|鬃岩狼人|rock","746|弱丁魚|water","748|超壞星|poison|water","750|重泥挽馬|ground","752|滴蛛霸|water|bug","754|蘭螳花|grass","758|焰后蜥|poison|fire","760|穿著熊|normal|fighting","763|甜冷美后|grass","764|花療環環|fairy","765|智揮猩|normal|psychic","768|具甲武者|bug|water","770|噬沙堡爺|ghost|ground","773|銀伴戰獸|normal","774|小隕星|rock|flying","775|樹枕尾熊|normal","776|爆焰龜獸|fire|dragon","777|托戈德瑪爾|electric|steel","778|謎擬Q|ghost|fairy","779|磨牙彩皮魚|water|psychic","780|老翁龍|normal|dragon","781|破破舵輪|ghost|grass","784|杖尾鱗甲龍|dragon|fighting","785|卡璞・鳴鳴|electric|fairy",
+            "812|轟擂金剛猩|grass","815|閃焰王牌|fire","818|千面避役|water","820|藏飽栗鼠|normal","823|鋼鎧鴉|flying|steel","826|以歐路普|bug|psychic","832|毛毛角羊|normal","834|暴噬龜|water|rock","839|巨炭山|rock|fire","842|蘋裹龍|grass|dragon","845|古月鳥|flying|water","849|顫弦貍|electric|poison","851|焚焰蚣|fire|bug","853|八爪武師|fighting","855|怖思壺|ghost","858|布莉姆溫|psychic|fairy","861|長毛巨魔|dark|fairy","862|堵攔熊|dark|normal","865|蔥遊兵|fighting","869|霜奶仙|fairy","870|列陣兵|fighting","871|啪嚓海膽|electric","873|雪絨蛾|ice|bug","874|巨石丁|rock","875|冰砌鵝|ice","877|莫魯貝可|electric|dark","879|大王銅象|steel","884|鋁鋼龍|steel|dragon","887|多龍巴魯托|dragon|ghost","892|武道熊師|fighting","905|眷戀雲|fairy|flying"
+        ];
+
+        const POKEMON_DB = RAW_DATA.map(str => {
+            const parts = str.split('|');
+            return { id: parseInt(parts[0]), name: parts[1], types: parts.slice(2) };
+        });
+
+        const TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'steel', 'dark', 'fairy'];
+        
+        const TYPE_ICONS = {
+            normal: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/normal.svg',
+            fire: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/fire.svg',
+            water: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/water.svg',
+            grass: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/grass.svg',
+            electric: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/electric.svg',
+            ice: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/ice.svg',
+            fighting: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/fighting.svg',
+            poison: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/poison.svg',
+            ground: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/ground.svg',
+            flying: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/flying.svg',
+            psychic: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/psychic.svg',
+            bug: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/bug.svg',
+            rock: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/rock.svg',
+            ghost: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/ghost.svg',
+            dragon: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/dragon.svg',
+            steel: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/steel.svg',
+            dark: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/dark.svg',
+            fairy: 'https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/fairy.svg'
+        };
+
+        const TYPE_NAMES = { 'normal':'一般', 'fire':'火', 'water':'水', 'grass':'草', 'electric':'電', 'ice':'冰', 'fighting':'格鬥', 'poison':'毒', 'ground':'地面', 'flying':'飛行', 'psychic':'超能', 'bug':'蟲', 'rock':'岩石', 'ghost':'幽靈', 'dragon':'龍', 'steel':'鋼', 'dark':'惡', 'fairy':'妖精' };
+
+        const TYPE_CHART = {
+            normal: { rock: 0.5, ghost: 0, steel: 0.5 },
+            fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
+            water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+            grass: { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5 },
+            electric: { water: 2, grass: 0.5, electric: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+            ice: { fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5 },
+            fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5 },
+            poison: { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2 },
+            ground: { fire: 2, grass: 0.5, electric: 2, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2 },
+            flying: { grass: 2, electric: 0.5, fighting: 2, bug: 2, rock: 0.5, steel: 0.5 },
+            psychic: { fighting: 2, poison: 2, psychic: 0.5, dark: 0, steel: 0.5 },
+            bug: { fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5 },
+            rock: { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5 },
+            ghost: { normal: 0, psychic: 2, ghost: 2, dark: 0.5 },
+            dragon: { dragon: 2, steel: 0.5, fairy: 0 },
+            steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
+            dark: { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, fairy: 0.5 },
+            fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 }
+        };
+
+        function getIconHtml(type, isMini = false) {
+            const wrapperClass = isMini ? 'type-icon-wrapper mini-icon-wrapper' : 'type-icon-wrapper';
+            const svgClass = isMini ? 'type-icon-svg mini-icon-svg' : 'type-icon-svg';
+            return `<div class="${wrapperClass} bg-${type}"><img src="${TYPE_ICONS[type]}" class="${svgClass}"></div>`;
+        }
+
+        class Game {
+            constructor() {
+                this.mode = 'attack';
+                this.rounds = 10;
+                this.currRound = 0;
+                this.playerTeam = [];
+                this.selectedTypes = new Set();
+                this.selectedPokemon = null;
+                this.currentDraftFilter = 'all';
+                this.soundEnabled = true;
+
+                this.initTypeUI();
+                this.generateTypeChart();
+            }
+
+            // === 聲音控制 ===
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                const btn = document.getElementById('btn-sound');
+                if (this.soundEnabled) {
+                    btn.textContent = '🔊 開啟';
+                    btn.classList.remove('muted');
+                } else {
+                    btn.textContent = '🔇 靜音';
+                    btn.classList.add('muted');
+                }
+            }
+
+            playCry(id) {
+                if (!this.soundEnabled) return;
+                const audio = new Audio(`https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${id}.ogg`);
+                audio.volume = 0.4; 
+                audio.play().catch(e => console.log("Audio play failed (interaction needed):", e));
+            }
+
+            generateTypeChart() {
+                const container = document.getElementById('chart-container');
+                let html = '<table class="chart-table">';
+                html += '<thead><tr class="chart-header"><th>攻\\守</th>';
+                TYPES.forEach(t => { html += `<th><div class="type-icon-wrapper bg-${t}" style="width:20px;height:20px;margin:0;"><img src="${TYPE_ICONS[t]}" class="type-icon-svg" style="width:12px;height:12px;"></div></th>`; });
+                html += '</tr></thead><tbody>';
+                TYPES.forEach(atk => {
+                    html += `<tr><td class="chart-side-header"><div class="type-icon-wrapper bg-${atk}" style="width:20px;height:20px;margin:0;"><img src="${TYPE_ICONS[atk]}" class="type-icon-svg" style="width:12px;height:12px;"></div></td>`;
+                    TYPES.forEach(def => {
+                        let val = 1;
+                        if(TYPE_CHART[atk] && TYPE_CHART[atk][def] !== undefined) val = TYPE_CHART[atk][def];
+                        let cellClass = ''; let content = '';
+                        if(val === 2) { cellClass = 'cell-2x'; content = '2'; }
+                        else if(val === 0.5) { cellClass = 'cell-05x'; content = '½'; }
+                        else if(val === 0) { cellClass = 'cell-0x'; content = '0'; }
+                        html += `<td class="${cellClass}">${content}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+
+            toggleChart() {
+                const modal = document.getElementById('modal-chart');
+                if(modal.style.display === 'flex') modal.style.display = 'none';
+                else modal.style.display = 'flex';
+            }
+
+            initTypeUI() {
+                const grid = document.getElementById('ui-types');
+                TYPES.forEach(t => {
+                    const b = document.createElement('div');
+                    b.className = `game-btn bg-${t}`;
+                    b.innerHTML = `${getIconHtml(t)} ${TYPE_NAMES[t]}`;
+                    b.onclick = () => this.toggleType(t, b);
+                    grid.appendChild(b);
+                });
+            }
+
+            toggleType(type, btn) {
+                if(document.getElementById('btn-submit').disabled) return;
+                if (this.selectedTypes.has(type)) {
+                    this.selectedTypes.delete(type);
+                    btn.classList.remove('selected');
+                } else {
+                    if (this.selectedTypes.size >= 2) { alert("最多選2個"); return; }
+                    this.selectedTypes.add(type);
+                    btn.classList.add('selected');
+                }
+            }
+
+            initMode(m) {
+                this.mode = m;
+                document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+                if (m === 'team') this.startDraft();
+                else this.startGame();
+            }
+
+            quitToMenu() {
+                if (confirm("確定要結束目前遊戲，回到主選單嗎？")) {
+                    document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+                    document.getElementById('screen-menu').classList.add('active');
+                }
+            }
+
+            startDraft() {
+                document.getElementById('screen-draft').classList.add('active');
+                this.playerTeam = [];
+                this.currentDraftFilter = 'all';
+                this.initDraftSidebar();
+                this.renderDraftGrid();
+                this.updateDraftStatus();
+            }
+
+            randomDraft() {
+                this.playerTeam = [];
+                let available = [...POKEMON_DB];
+                available.sort(() => Math.random() - 0.5);
+                let usedTypes = new Set();
+                for (let poke of available) {
+                    if (this.playerTeam.length >= 6) break;
+                    let isUnique = true;
+                    for (let t of poke.types) {
+                        if (usedTypes.has(t) && poke.types.indexOf(t) === 0) isUnique = false;
+                    }
+                    if (isUnique || this.playerTeam.length < 2) { 
+                        this.playerTeam.push(poke);
+                        poke.types.forEach(t => usedTypes.add(t));
+                    }
+                }
+                if (this.playerTeam.length < 6) {
+                    let remain = available.filter(p => !this.playerTeam.includes(p));
+                    while(this.playerTeam.length < 6 && remain.length > 0) {
+                        this.playerTeam.push(remain.pop());
+                    }
+                }
+                this.updateDraftStatus();
+                this.renderDraftGrid(); 
+            }
+
+            initDraftSidebar() {
+                const sidebar = document.getElementById('draft-filter-list');
+                sidebar.innerHTML = '';
+                const btnAll = document.createElement('div');
+                btnAll.className = 'filter-btn active';
+                btnAll.textContent = '全部顯示';
+                btnAll.onclick = () => this.setDraftFilter('all', btnAll);
+                sidebar.appendChild(btnAll);
+                TYPES.forEach(t => {
+                    const btn = document.createElement('div');
+                    btn.className = 'filter-btn';
+                    btn.innerHTML = `${getIconHtml(t, true)} ${TYPE_NAMES[t]}`;
+                    btn.style.borderLeft = `4px solid #ccc`;
+                    btn.onclick = () => this.setDraftFilter(t, btn);
+                    sidebar.appendChild(btn);
+                });
+            }
+
+            setDraftFilter(type, btnElement) {
+                this.currentDraftFilter = type;
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btnElement.classList.add('active');
+                this.renderDraftGrid();
+            }
+
+            renderDraftGrid() {
+                const grid = document.getElementById('draft-grid');
+                grid.innerHTML = '';
+                const filteredList = this.currentDraftFilter === 'all' 
+                    ? POKEMON_DB 
+                    : POKEMON_DB.filter(p => p.types.includes(this.currentDraftFilter));
+
+                filteredList.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'draft-card';
+                    if (this.playerTeam.includes(p)) card.classList.add('picked');
+
+                    const typeDots = p.types.map(t => `<span class="mini-type-dot bg-${t}"></span>`).join(' ');
+
+                    card.innerHTML = `
+                        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png" loading="lazy">
+                        <div class="draft-name">${p.name}</div>
+                        <div class="draft-types">${typeDots}</div>
+                    `;
+                    
+                    card.onclick = () => {
+                        // 點擊卡片時播放叫聲 (如果沒選取過)
+                        this.playCry(p.id);
+
+                        if (this.playerTeam.includes(p)) {
+                            this.playerTeam = this.playerTeam.filter(x => x !== p);
+                            card.classList.remove('picked');
+                        } else {
+                            if (this.playerTeam.length >= 6) return;
+                            this.playerTeam.push(p);
+                            card.classList.add('picked');
+                        }
+                        this.updateDraftStatus();
+                    };
+                    grid.appendChild(card);
+                });
+            }
+
+            updateDraftStatus() {
+                document.getElementById('draft-count').textContent = this.playerTeam.length;
+                const btn = document.getElementById('btn-start-team');
+                if (this.playerTeam.length === 6) {
+                    btn.disabled = false;
+                    btn.style.backgroundColor = '#4caf50';
+                    btn.style.cursor = 'pointer';
+                } else {
+                    btn.disabled = true;
+                    btn.style.backgroundColor = '#ccc';
+                    btn.style.cursor = 'not-allowed';
+                }
+            }
+
+            finishDraft() {
+                this.startGame();
+            }
+
+            startGame() {
+                document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+                document.getElementById('screen-game').classList.add('active');
+                const uiType = document.getElementById('ui-types');
+                const uiTeam = document.getElementById('ui-team');
+                if (this.mode === 'team') {
+                    uiType.style.display = 'none';
+                    uiTeam.style.display = 'grid';
+                    this.renderBattleTeam();
+                } else {
+                    uiType.style.display = 'grid';
+                    uiTeam.style.display = 'none';
+                }
+                this.currRound = 0;
+                this.nextRound();
+            }
+
+            renderBattleTeam() {
+                const grid = document.getElementById('ui-team');
+                grid.innerHTML = '';
+                this.playerTeam.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'team-card';
+                    const badges = p.types.map(t => `<span class="type-badge-text bg-${t}">${getIconHtml(t, true)} ${TYPE_NAMES[t]}</span>`).join('');
+                    card.innerHTML = `
+                        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png" style="width:60px;height:60px;">
+                        <div style="font-size:0.8em;font-weight:bold">${p.name}</div>
+                        <div style="display:flex;justify-content:center;margin-top:2px;flex-wrap:wrap;">${badges}</div>
+                    `;
+                    card.onclick = () => {
+                        if(document.getElementById('btn-submit').style.display === 'none') return;
+                        
+                        // 戰鬥中點擊隊伍，也播放一下叫聲
+                        this.playCry(p.id);
+
+                        document.querySelectorAll('.team-card').forEach(c=>c.classList.remove('selected'));
+                        this.selectedPokemon = p;
+                        card.classList.add('selected');
+                    };
+                    grid.appendChild(card);
+                });
+            }
+
+            nextRound() {
+                if (this.currRound >= this.rounds) {
+                    this.endGame();
+                    return;
+                }
+                this.currRound++;
+                document.getElementById('round-current').textContent = this.currRound;
+                this.selectedTypes.clear();
+                this.selectedPokemon = null;
+                document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('selected'));
+                document.querySelectorAll('.team-card').forEach(c => c.classList.remove('selected'));
+                
+                this.enemy = POKEMON_DB[Math.floor(Math.random() * POKEMON_DB.length)];
+                document.getElementById('enemy-name').textContent = this.enemy.name;
+                
+                // 設定圖片 (先隱藏)
+                const enemyImg = document.getElementById('enemy-img');
+                enemyImg.style.opacity = '0'; 
+                enemyImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${this.enemy.id}.png`;
+                
+                // 設定文字與按鈕
+                const nameText = document.getElementById('enemy-name');
+                nameText.style.opacity = '0';
+
+                document.getElementById('enemy-reveal').innerHTML = `<span style="color:#999">??? 屬性 ???</span>`;
+                let hint = "";
+                if (this.mode === 'team') hint = "請派出寶可夢！";
+                else if (this.mode === 'attack') hint = "請選擇 剋制 它的屬性！";
+                else hint = "請選擇 抵抗 它的屬性！";
+                document.getElementById('round-log').innerHTML = hint;
+                document.getElementById('btn-submit').style.display = 'inline-block';
+                document.getElementById('btn-next').style.display = 'none';
+
+                // 延遲 1 秒後顯示並播放聲音
+                setTimeout(() => {
+                    enemyImg.style.opacity = '1';
+                    nameText.style.opacity = '1';
+                    this.playCry(this.enemy.id);
+                }, 1000);
+            }
+
+            calcDmg(atk, defs) {
+                let m = 1;
+                defs.forEach(d => { if(TYPE_CHART[atk] && TYPE_CHART[atk][d]!=undefined) m *= TYPE_CHART[atk][d]; });
+                return m;
+            }
+
+            submit() {
+                if (this.mode === 'team' && !this.selectedPokemon) { alert("請選寶可夢"); return; }
+                if (this.mode !== 'team' && this.selectedTypes.size === 0) { alert("請選屬性"); return; }
+
+                const reveal = document.getElementById('enemy-reveal');
+                reveal.innerHTML = this.enemy.types.map(t => `<span class="type-badge-text bg-${t}">${getIconHtml(t, true)} ${TYPE_NAMES[t]}</span>`).join('');
+
+                let log = "";
+
+                if (this.mode === 'attack') {
+                    let max = 0;
+                    this.selectedTypes.forEach(t => { const v = this.calcDmg(t, this.enemy.types); if(v>max) max=v; });
+                    if (max >= 4) log = "<span class='text-super'>效果絕佳！！ (x4)</span>";
+                    else if (max > 1) log = "<span class='text-super'>效果絕佳 (x2)</span>";
+                    else log = "<span class='text-immune'>效果不好/無效...</span>";
+                } 
+                else if (this.mode === 'defense') {
+                    let fail = false;
+                    let details = [];
+                    const defs = Array.from(this.selectedTypes);
+                    
+                    this.enemy.types.forEach(et => {
+                        const v = this.calcDmg(et, defs);
+                        let status = "";
+                        if(v > 1) { fail = true; status = `<span class="text-super">被剋制 (x${v})</span>`; }
+                        else if(v < 1) status = `<span class="text-weak">抵抗 (x${v})</span>`;
+                        else status = `<span class="text-normal">普通 (x1)</span>`;
+                        details.push(`${TYPE_ICONS[et] ? `<img src="${TYPE_ICONS[et]}" style="width:14px;vertical-align:middle">` : et} ${status}`);
+                    });
+
+                    log = details.join('<br>');
+                    if(!fail) {
+                        let allResist = this.enemy.types.every(et => this.calcDmg(et, defs) < 1);
+                        if(allResist) log += `<br><span class='text-perfect'>★ 完美防守！</span>`;
+                        else log += `<br><span class='text-weak'>防守成功 (未被突破)</span>`;
+                    } else {
+                        log += `<br><span class='text-super'>防守失敗！</span>`;
+                    }
+                } 
+                else {
+                    let myMax = 0;
+                    this.selectedPokemon.types.forEach(t => { const v = this.calcDmg(t, this.enemy.types); if(v>myMax) myMax=v; });
+                    let enMax = 0;
+                    this.enemy.types.forEach(t => { const v = this.calcDmg(t, this.selectedPokemon.types); if(v>enMax) enMax=v; });
+
+                    log = `我方攻擊 x${myMax} | 敵方攻擊 x${enMax}<br>`;
+                    if (myMax > 1 && enMax < 1) {
+                        log += `<span class="text-perfect">★ 完美攻防！ ★</span>`;
+                    } else if (myMax > 1) {
+                        log += `<span class="text-super">進攻成功！</span>`;
+                    } else if (enMax < 1) {
+                        log += `<span class="text-weak">防守成功！</span>`;
+                    } else {
+                        log += `<span class="text-immune">效果普通</span>`;
+                    }
+                }
+
+                document.getElementById('round-log').innerHTML = log;
+                document.getElementById('btn-submit').style.display = 'none';
+                document.getElementById('btn-next').style.display = 'inline-block';
+            }
+
+            endGame() {
+                document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+                document.getElementById('screen-result').classList.add('active');
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>
